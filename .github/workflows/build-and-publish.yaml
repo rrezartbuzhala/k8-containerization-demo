@@ -54,18 +54,9 @@ jobs:
         
     - name: Update image versions in YAML files
       run: |
-        find . -type f -name '*.yaml' -print0 | while IFS= read -r -d $'\0' file; do
+        find . -type f \( -iname '*.yaml' -o -iname '*.yml' -o -iname '*.md' \) -print0 | while IFS= read -r -d $'\0' file; do
           if grep -q -E 'image:[[:space:]]+[^:]+:[^ ]+' "$file"; then
             sed -i -E "s|(image:[[:space:]]+[^:]+):[^ ]+|\1:${{ env.TAG }}|" "$file"
-            git add "$file"
-          fi
-        done
-
-    - name: Update image tag in Markdown files
-      run: |
-        find . -type f -name '*.md' -print0 | while IFS= read -r -d $'\0' file; do
-          if grep -q -E 'jeanfrg\/app1:[^ ]+' "$file"; then
-            sed -i -E "s|(jeanfrg/app1):[^ ]+|\1:${{ env.TAG }}|" "$file"
             git add "$file"
           fi
         done
