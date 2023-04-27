@@ -1,7 +1,7 @@
 # Gettomg Started with Kubernetes
 
 ## Prerequisites 
-* .NET SDK installed
+* .NET 7 SDK & Runtime
 * Docker Desktop
 
 ## Scenario
