@@ -1,0 +1,43 @@
+name: Update Image Tag
+
+on:
+  workflow_run:
+    workflows: ["Build and Publish Image"]
+    types:
+      - completed
+
+jobs:
+  update-image-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install yq
+      run: sudo snap install yq
+
+    - name: Update image tag
+      run: |
+        find . -type f -name '*.yaml' -print0 | while IFS= read -r -d $'\0' file; do
+          if yq e '.spec.template.spec.containers[]?.image | select(. and (. | startswith("jeanfrg/app1:")))' "$file"; then
+            yq eval -i '.spec.template.spec.containers[] |= (select(.image | startswith("jeanfrg/app1:")) .image = env(NEW_IMAGE_TAG))' "$file"
+            git add "$file"
+          fi
+        done
+
+    - name: Update image tag in Markdown files
+      run: |
+        find . -type f -name '*.md' -print0 | while IFS= read -r -d $'\0' file; do
+          if grep -q -E 'jeanfrg\/app1:[^ ]+' "$file"; then
+            sed -i -E "s|(jeanfrg/app1):[^ ]+|\1:${NEW_IMAGE_TAG}|" "$file"
+            git add "$file"
+          fi
+        done
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -m "Update image tag to ${NEW_IMAGE_TAG}" || true
+        git push

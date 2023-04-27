@@ -1,4 +1,4 @@
-name: Build and Publish Docker Image
+name: Build and Publish Image
 
 on:
   push:
@@ -46,8 +46,14 @@ jobs:
         NEW_TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
         echo "New tag: $NEW_TAG"
         echo "TAG=$NEW_TAG" >> $GITHUB_ENV
+        echo "::set-output name=image_tag::$NEW_TAG"
 
     - name: Publish Docker image
       run: |
         docker tag app1 ${{ secrets.DOCKER_HUB_USERNAME }}/app1:${{ env.TAG }}
         docker push ${{ secrets.DOCKER_HUB_USERNAME }}/app1:${{ env.TAG }}
+
+    - name: Pass image tag to Update Image Tag workflow
+      if: ${{ github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success' }}
+      run: |
+        echo "NEW_IMAGE_TAG=${{ steps.set-image-tag.outputs.image_tag }}" >> $GITHUB_ENV
