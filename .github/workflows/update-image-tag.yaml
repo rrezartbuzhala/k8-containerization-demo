@@ -1,5 +1,7 @@
 name: Update Image Tag
 
+permissions: write-all
+
 on:
   workflow_run:
     workflows: ["Build and Publish Image"]
