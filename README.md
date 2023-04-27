@@ -369,7 +369,7 @@ The ArgoCD application manifest also need to be created for both these deploymen
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app1
+  name: dev-app1
   namespace: argocd
 spec:
   project: default
@@ -391,7 +391,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app1
+  name: prod-app1
   namespace: argocd
 spec:
   project: default
