@@ -1,7 +1,7 @@
 spec:
   ports:
     - name: http
-      port: 5001
+      port: 5010
       protocol: TCP
       targetPort: 8080
   type: LoadBalancer

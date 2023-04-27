@@ -214,7 +214,7 @@ To expose ArgoCD we need to change the directory to `kubernetes/apps/argocd` and
 kubectl patch svc argocd-server -n argocd --type=merge --patch-file argocd-server.service.patch.yaml
 ```
 
-With this patch we're now able to access the service outside of Kubernetes using `http://localhost:5001/`. The initial password for the admin user account can be found inside the secret `argocd-initial-admin-secret`.
+With this patch we're now able to access the service outside of Kubernetes using `http://localhost:5010/`. The initial password for the admin user account can be found inside the secret `argocd-initial-admin-secret`.
 
 ```bash
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}'
@@ -283,3 +283,139 @@ The key components of Kustomize are:
 2. **Overlay:** A set of modifications applied to the base resources to adapt them for a specific environment or purpose.
 3. **kustomization.yaml:** A configuration file that defines how to combine the base resources and overlays, including instructions for merging and patching resources.
 
+### Restructing our application for multiple environments
+
+Let's say we need this application to be deployed for the development and production environments. We can either take the approach of copying each Kubernetes manifest for every environment or we can use Kustomize to reuse manifests per environment.
+
+First we need to create these directories.
+
+```
+kubernetes/apps/app1/bases
+kubernetes/apps/app1/overlays/development
+kubernetes/apps/app1/overlays/production
+```
+
+Move the manifests found at `kubernetes/apps/app1/` to `kubernetes/apps/app1/bases`. As implied, we will use thes manifests as the base of each environment manifest.
+
+Within the directories `kubernetes/apps/app1/overlays/development` and `kubernetes/apps/app1/overlays/production`, create these files.
+
+```yaml
+# kubernetes/apps/app1/overlays/development/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namePrefix: dev-
+
+resources:
+  - ../../base
+```
+
+```yaml
+# kubernetes/apps/app1/overlays/production/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namePrefix: prod-
+
+resources:
+  - ../../base
+```
+
+Two differences that we want the production deployment to have is a different port and an increased replicas. To achieve this we use the concept of patches, which are used to modify resources.
+
+```yaml
+# kubernetes/apps/app1/overlays/production/deployment.patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1
+spec:
+  replicas: 3
+```
+
+```yaml
+# kubernetes/apps/app1/overlays/production/service.patch.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1
+spec:
+  ports:
+    - name: http
+      port: 5001
+```
+
+Next, we need to modify the production `kustomization.yaml` so that it references these patch files.
+
+```yaml
+# kubernetes/apps/app1/overlays/production/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namePrefix: prod-
+
+resources:
+  - ../../base
+
+patches:
+  - path: deployment.patch.yaml
+  - path: service.patch.yaml
+```
+
+The ArgoCD application manifest also need to be created for both these deployments.
+
+```yaml
+# kubernetes/apps/app1/overlays/development/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/frg/k8-containerization-demo.git'
+    targetRevision: main
+    path: kubernetes/apps/app1/overlays/development
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+```yaml
+# kubernetes/apps/app1/overlays/production/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/frg/k8-containerization-demo.git'
+    targetRevision: main
+    path: kubernetes/apps/app1/overlays/production
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+Commit these changes to your repository and finally, we can apply these manifests.
+
+```bash
+# kubernetes/apps/app1/overlays/production
+kubectl apply -f application.yaml
+```
+
+```bash
+# kubernetes/apps/app1/overlays/development
+kubectl apply -f application.yaml
+```

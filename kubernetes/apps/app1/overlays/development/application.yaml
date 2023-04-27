@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: 'https://github.com/frg/k8-containerization-demo.git'
     targetRevision: main
-    path: kubernetes/apps/app1
+    path: kubernetes/apps/app1/overlays/development
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: default
