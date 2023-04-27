@@ -1,6 +1,7 @@
 name: Update Image Tag
 
-permissions: write-all
+permissions:
+  contents: write
 
 on:
   workflow_run:
@@ -16,14 +17,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install yq
-      run: sudo snap install yq
-
-    - name: Update image tag
+    - name: Update image versions in YAML files
       run: |
         find . -type f -name '*.yaml' -print0 | while IFS= read -r -d $'\0' file; do
-          if yq e '.spec.template.spec.containers[]?.image | select(. and (. | startswith("jeanfrg/app1:")))' "$file"; then
-            yq eval -i '.spec.template.spec.containers[] |= (select(.image | startswith("jeanfrg/app1:")) .image = env(NEW_IMAGE_TAG))' "$file"
+          if grep -q -E 'image:[[:space:]]+[^:]+:[^ ]+' "$file"; then
+            sed -i -E "s|(image:[[:space:]]+[^:]+):[^ ]+|\1:${NEW_IMAGE_TAG}|" "$file"
             git add "$file"
           fi
         done
