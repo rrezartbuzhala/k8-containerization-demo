@@ -186,4 +186,100 @@ http://localhost:5000/WeatherForecast
 ```
 
 ## ArgoCD
+
+Argo CD is an open-source, Kubernetes-native Continuous Delivery (CD) tool that automates the deployment, scaling, and management of applications in Kubernetes clusters. It follows the GitOps methodology, which uses Git as the single source of truth for declarative infrastructure and application configurations.
+
+### Setting up ArgoCD
+
+To install ArgoCD in Kubernetes we first need to create the ArgoCD namespace. Kubernetes namespaces are a way to divide cluster resources among multiple users, teams, or projects.
+
+```bash
+kubectl create namespace argocd
+```
+
+Next we need to apply the ArgoCD manifests
+
+```bash
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/master/manifests/install.yaml
+```
+
+Sources
+
+[https://argo-cd.readthedocs.io/en/stable/getting_started/#1-install-argo-cd](https://argo-cd.readthedocs.io/en/stable/getting_started/#1-install-argo-cd)
+[https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/#non-high-availability](https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/#non-high-availability)
+
+To expose ArgoCD we need to change the directory to `kubernetes/apps/argocd` and patch its `argocd-server` service.
+
+```bash
+kubectl patch svc argocd-server -n argocd --type=merge --patch-file argocd-server.service.patch.yaml
+```
+
+With this patch we're now able to access the service outside of Kubernetes using `http://localhost:5001/`. The initial password for the admin user account can be found inside the secret `argocd-initial-admin-secret`.
+
+```bash
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}'
+```
+
+The value is bse64 encoded, it can be decoded in various ways, however it depends on the shell you're using.
+
+Ubuntu/WSL
+```bash
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 --decode
+```
+
+Windows/PowerShell
+```powershell
+([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String((kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}'))))
+```
+
+Using the username `admin` and the password retreived from wither commands, we're now able to login to ArgoCD.
+
+### Configuring the application for ArgoCD
+
+We're now ready to configure ArgoCD to manage the deployment of our application when our Kubernetes manifests for our application change.
+
+To achieve this, we need to create a manifest of kind Application in the directory `kubernetes/apps/argocd/applications` with the name `app1.yaml`
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/frg/k8-containerization-demo.git'
+    targetRevision: main
+    path: kubernetes/apps/app1
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+Change the directory to `kubernetes/apps/argocd/applications` and apply the manifest in kubernetes.
+
+```bash
+kubectl apply -f app1.yaml
+```
+
+Checking the ArgoCD UI we should now be able to see our application and its sync status. To test if ArgoCD can successfully pick up manifest changes, we can open the `deployment.yaml` in `kubernetes/apps/app1`, change `spec.replicas` to `2`, commit and push our changes.
+
+By default ArgoCD polls the configured repository specified in `kubernetes/apps/argocd/applications/app1.yaml` at `spec.source.repoURL` every 180 seconds.
+
+Once the changes have been picked up we will be able to see 2 pods that have been deployed instead of 1. For this demo we don't need two so feel free to reduce it back to 1.
+
 ## Kustomize
+
+Kustomize is a tool for customizing Kubernetes resources through a base and overlay approach. It is designed to make it easy to manage and maintain Kubernetes resource configurations across different environments (e.g., development, staging, production) without requiring manual changes or complex templating systems.
+
+The key components of Kustomize are:
+
+1. **Base:** The base resources that define the core structure and functionality of an application.
+2. **Overlay:** A set of modifications applied to the base resources to adapt them for a specific environment or purpose.
+3. **kustomization.yaml:** A configuration file that defines how to combine the base resources and overlays, including instructions for merging and patching resources.
+
