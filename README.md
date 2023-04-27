@@ -128,7 +128,7 @@ spec:
     spec:
       containers:
       - name: app1
-        image: jeanfrg/app1:v1
+        image: jeanfrg/app1:v1.0.10
         ports:
         - containerPort: 8080
 ```
