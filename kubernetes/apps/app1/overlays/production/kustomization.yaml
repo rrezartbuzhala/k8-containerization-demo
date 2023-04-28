@@ -8,4 +8,8 @@ resources:
 
 patches:
   - path: deployment.patch.yaml
-  - path: service.patch.yaml
+  - target:
+      version: v1
+      kind: Service
+      name: app1
+    path: service.patch.yaml
